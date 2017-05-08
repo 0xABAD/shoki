@@ -3,6 +3,7 @@ setlocal enableextensions
 
 set SRC=%CD%\src
 set DEBUG=-g
+set RELEASE=-O3
 set TARGET=%DEBUG%
 
 if not exist build (mkdir build)
