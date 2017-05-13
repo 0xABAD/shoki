@@ -1,9 +1,26 @@
 #include "bl_common.hpp"
 #include "bl_winhelp.cpp" // allocate_console
 
+#include <gdiplus.h>
+#include <cstring>
+#include <cassert>
+
+namespace gp {
+using namespace Gdiplus;
+}
+
 struct AppState {
     HHOOK     kb_hook;
     HINSTANCE hInstance;
+    bool      hideWindow;
+    bool      hasError;
+
+    void check_status(gp::Status status) {
+        if (status != gp::Ok && !hasError) {
+            hasError = true;
+            MessageBoxA(nullptr, "GDI+ error", "Error", MB_OK|MB_ICONEXCLAMATION);
+        }
+    }
 };
 
 static HWND WINDOW;
@@ -32,87 +49,87 @@ void set_key(u32 vk_key)
     }
 }
 
-char const * get_key(u32 vk_key, bool isShiftDown)
+wchar_t const * get_key(u32 vk_key, bool isShiftDown)
 {
     switch (vk_key) {
-    case 0x08: return "BSPC";
-    case 0x09: return "TAB";
-    case 0x0D: return "ENTER";
-    case 0x14: return "CAPS";
-    case 0x20: return "SPC";
-    case 0x21: return "PG_UP";
-    case 0x22: return "PG_DOWN";
-    case 0x23: return "END";
-    case 0x24: return "HOME";
-    case 0x25: return "LEFT";
-    case 0x26: return "UP";
-    case 0x27: return "RIGHT";
-    case 0x28: return "DOWN";
-    case 0x2D: return "INS";
-    case 0x2E: return "DEL";
-    case 0x30: return isShiftDown ? ")" : "0";
-    case 0x31: return isShiftDown ? "!" : "1";
-    case 0x32: return isShiftDown ? "@" : "2";
-    case 0x33: return isShiftDown ? "#" : "3";
-    case 0x34: return isShiftDown ? "$" : "4";
-    case 0x35: return isShiftDown ? "%" : "5";
-    case 0x36: return isShiftDown ? "^" : "6";
-    case 0x37: return isShiftDown ? "&" : "7";
-    case 0x38: return isShiftDown ? "*" : "8";
-    case 0x39: return isShiftDown ? "(" : "9";
-    case 0x41: return "A";
-    case 0x42: return "B";
-    case 0x43: return "C";
-    case 0x44: return "D";
-    case 0x45: return "E";
-    case 0x46: return "F";
-    case 0x47: return "G";
-    case 0x48: return "H";
-    case 0x49: return "I";
-    case 0x4A: return "J";
-    case 0x4B: return "K";
-    case 0x4C: return "L";
-    case 0x4D: return "M";
-    case 0x4E: return "N";
-    case 0x4F: return "O";
-    case 0x50: return "P";
-    case 0x51: return "Q";
-    case 0x52: return "R";
-    case 0x53: return "S";
-    case 0x54: return "T";
-    case 0x55: return "U";
-    case 0x56: return "V";
-    case 0x57: return "W";
-    case 0x58: return "X";
-    case 0x59: return "Y";
-    case 0x5A: return "Z";
+    case 0x08: return L"BSPC";
+    case 0x09: return L"TAB";
+    case 0x0D: return L"ENTER";
+    case 0x14: return L"CAPS";
+    case 0x20: return L"SPC";
+    case 0x21: return L"PG_UP";
+    case 0x22: return L"PG_DOWN";
+    case 0x23: return L"END";
+    case 0x24: return L"HOME";
+    case 0x25: return L"LEFT";
+    case 0x26: return L"UP";
+    case 0x27: return L"RIGHT";
+    case 0x28: return L"DOWN";
+    case 0x2D: return L"INS";
+    case 0x2E: return L"DEL";
+    case 0x30: return isShiftDown ? L")" : L"0";
+    case 0x31: return isShiftDown ? L"!" : L"1";
+    case 0x32: return isShiftDown ? L"@" : L"2";
+    case 0x33: return isShiftDown ? L"#" : L"3";
+    case 0x34: return isShiftDown ? L"$" : L"4";
+    case 0x35: return isShiftDown ? L"%" : L"5";
+    case 0x36: return isShiftDown ? L"^" : L"6";
+    case 0x37: return isShiftDown ? L"&" : L"7";
+    case 0x38: return isShiftDown ? L"*" : L"8";
+    case 0x39: return isShiftDown ? L"(" : L"9";
+    case 0x41: return L"A";
+    case 0x42: return L"B";
+    case 0x43: return L"C";
+    case 0x44: return L"D";
+    case 0x45: return L"E";
+    case 0x46: return L"F";
+    case 0x47: return L"G";
+    case 0x48: return L"H";
+    case 0x49: return L"I";
+    case 0x4A: return L"J";
+    case 0x4B: return L"K";
+    case 0x4C: return L"L";
+    case 0x4D: return L"M";
+    case 0x4E: return L"N";
+    case 0x4F: return L"O";
+    case 0x50: return L"P";
+    case 0x51: return L"Q";
+    case 0x52: return L"R";
+    case 0x53: return L"S";
+    case 0x54: return L"T";
+    case 0x55: return L"U";
+    case 0x56: return L"V";
+    case 0x57: return L"W";
+    case 0x58: return L"X";
+    case 0x59: return L"Y";
+    case 0x5A: return L"Z";
 
-    case 0xBA: return isShiftDown ? ":" : ";";
-    case 0xBB: return isShiftDown ? "=" : "+";
-    case 0xBC: return isShiftDown ? "<" : ",";
-    case 0xBD: return isShiftDown ? "_" : "-";
-    case 0xBE: return isShiftDown ? ">" : ".";
-    case 0xBF: return isShiftDown ? "?" : "/";
-    case 0xC0: return isShiftDown ? "~" : "`";
-    case 0xDB: return isShiftDown ? "{" : "[";
-    case 0xDC: return isShiftDown ? "|" : "\\";
-    case 0xDD: return isShiftDown ? "}" : "]";
-    case 0xDE: return isShiftDown ? "\"" : "'";
+    case 0xBA: return isShiftDown ? L":" : L";";
+    case 0xBB: return isShiftDown ? L"=" : L"+";
+    case 0xBC: return isShiftDown ? L"<" : L",";
+    case 0xBD: return isShiftDown ? L"_" : L"-";
+    case 0xBE: return isShiftDown ? L">" : L".";
+    case 0xBF: return isShiftDown ? L"?" : L"/";
+    case 0xC0: return isShiftDown ? L"~" : L"`";
+    case 0xDB: return isShiftDown ? L"{" : L"[";
+    case 0xDC: return isShiftDown ? L"|" : L"\\";
+    case 0xDD: return isShiftDown ? L"}" : L"]";
+    case 0xDE: return isShiftDown ? L"\"" : L"'";
 
-    case 0x70: return "F1";
-    case 0x71: return "F2";
-    case 0x72: return "F3";
-    case 0x73: return "F4";
-    case 0x74: return "F5";
-    case 0x75: return "F6";
-    case 0x76: return "F7";
-    case 0x77: return "F8";
-    case 0x78: return "F9";
-    case 0x79: return "F10";
-    case 0x7A: return "F11";
-    case 0x7B: return "F12";
+    case 0x70: return L"F1";
+    case 0x71: return L"F2";
+    case 0x72: return L"F3";
+    case 0x73: return L"F4";
+    case 0x74: return L"F5";
+    case 0x75: return L"F6";
+    case 0x76: return L"F7";
+    case 0x77: return L"F8";
+    case 0x78: return L"F9";
+    case 0x79: return L"F10";
+    case 0x7A: return L"F11";
+    case 0x7B: return L"F12";
 
-    default: return "";
+    default: return L"";
     }
 }
 
@@ -123,8 +140,120 @@ constexpr void log(char const *msg)
 #endif
 }
 
+void draw_rectangle(gp::Graphics *graphics,
+                    i32 x1,
+                    i32 y1,
+                    i32 width,
+                    i32 height,
+                    gp::Color color)
+{
+    auto x2 = x1 + width;
+    auto y2 = y1 + height;
+
+    gp::GraphicsPath path;
+    gp::SolidBrush   brush(color);
+
+    path.AddArc(x1, y1, 25, 25, -180, 90);
+    path.AddArc(x2, y1, 25, 25,  -90, 90);
+    path.AddArc(x2, y2, 25, 25,    0, 90);
+    path.AddArc(x1, y2, 25, 25,   90, 90);
+    graphics->FillPath(&brush, &path);
+}
+
+void draw_keypresses(HWND hwnd, HDC hdc, RECT clientArea)
+{
+    wchar_t buf[32] = {0};
+    auto state   = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+    auto vk      = VK_KEYS[last_pos()];
+    auto key     = get_key(vk, SHIFT_KEY);
+    auto ctrl    = CTRL_KEY ? L"CTRL + " : L"";
+    auto alt     = ALT_KEY ? L"ALT + " : L"";
+    auto shift   = SHIFT_KEY ? L"SHIFT + " : L"";
+    auto written = swprintf_s(buf, L"%s%s%s%s", ctrl, alt, shift, key);
+
+    assert(written != -1);
+
+    gp::Graphics     graphics(hdc);
+    gp::Font         font(L"Consolas", 15, gp::FontStyleRegular, gp::UnitPixel);
+    gp::RectF        textDim(20, 55, 200, 15);
+    gp::SolidBrush   white(gp::Color(255, 255, 255, 255));
+    gp::Color        black(255, 1, 1, 1);
+    gp::StringFormat format;
+
+    graphics.SetSmoothingMode(gp::SmoothingModeHighQuality);
+    draw_rectangle(&graphics, 20, 20, 200, 80, black);
+    format.SetAlignment(gp::StringAlignmentCenter);
+    graphics.DrawString(buf, -1, &font, textDim, &format, &white);
+}
+
+void render(HWND hwnd)
+{
+    auto state = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+
+    if (state->hideWindow) {
+        RECT wndDim;
+        GetWindowRect(WINDOW, &wndDim);
+
+        auto width   = wndDim.right - wndDim.left;
+        auto height  = wndDim.bottom - wndDim.top;
+        auto screen  = GetDC(nullptr);
+        auto hdc     = CreateCompatibleDC(screen);
+        auto bmap    = CreateCompatibleBitmap(screen, width, height);
+        auto blend   = BLENDFUNCTION{};
+        auto dstPt   = POINT{wndDim.left, wndDim.top};
+        auto srcPt   = POINT{0, 0};
+        auto wndSz   = SIZE{width, height};
+
+        defer(DeleteObject(bmap));
+        defer(DeleteDC(hdc));
+
+        SelectObject(hdc, bmap);
+
+        gp::Graphics graphics(hdc);
+        gp::Pen      blackPen(gp::Color(255, 0, 0, 1), 5);
+
+        graphics.DrawRectangle(&blackPen, 0, 0, i32(width), i32(height));
+        draw_keypresses(hwnd, hdc, wndDim);
+
+        blend.BlendOp             = AC_SRC_OVER;
+        blend.BlendFlags          = 0;
+        blend.AlphaFormat         = AC_SRC_ALPHA;
+        blend.SourceConstantAlpha = 128;
+
+        UpdateLayeredWindow(hwnd,
+                            screen,
+                            &dstPt,
+                            &wndSz,
+                            hdc,
+                            &srcPt,
+                            RGB(0, 0, 0),
+                            &blend,
+                            ULW_COLORKEY);
+    }
+    else {
+        auto rect = RECT{};
+        auto ps   = PAINTSTRUCT{};
+        auto hdc  = BeginPaint(hwnd, &ps);
+
+        defer(EndPaint(hwnd, &ps));
+        GetClientRect(hwnd, &rect);
+    
+        auto width  = rect.right - rect.left - 1;
+        auto height = rect.bottom - rect.top - 1;
+
+        gp::Graphics   graphics(hdc);
+        gp::SolidBrush white(gp::Color(255, 255, 255, 255));
+
+        SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 255, LWA_ALPHA);
+        graphics.FillRectangle(&white, 0, 0, width, height);
+        draw_keypresses(hwnd, hdc, rect);
+    }
+}
+
 LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
 {
+    auto state = (AppState *)GetWindowLongPtr(WINDOW, GWLP_USERDATA);
+    
     if (code >= 0) {
         bool doRedraw = false;
         
@@ -155,6 +284,19 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
                 ALT_KEY = false;
             if (vk == VK_LSHIFT || vk == VK_RSHIFT) {
                 SHIFT_KEY = false;
+            }
+
+            auto toggleWindow = (vk == VK_F6 && SHIFT_KEY && CTRL_KEY && ALT_KEY);
+            if (toggleWindow) {
+                state->hideWindow = !state->hideWindow;
+
+                if (state->hideWindow) {
+                    auto current = GetWindowLong(WINDOW, GWL_EXSTYLE);
+                    auto cleared = current & ~WS_EX_LAYERED;
+
+                    SetWindowLong(WINDOW, GWL_EXSTYLE, cleared);
+                    SetWindowLong(WINDOW, GWL_EXSTYLE, cleared | WS_EX_LAYERED);
+                }
             }
 
             doRedraw = true;
@@ -198,8 +340,10 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
 
         } // end switch
 
-        if (doRedraw)
-            RedrawWindow(WINDOW, nullptr, nullptr, RDW_INVALIDATE|RDW_ERASENOW);
+        if (doRedraw) {
+            auto flags = RDW_ERASE|RDW_INVALIDATE|RDW_FRAME|RDW_ALLCHILDREN;
+            RedrawWindow(WINDOW, nullptr, nullptr, flags);
+        }
     }
 
     return CallNextHookEx(nullptr, code, wParam, lParam);
@@ -228,39 +372,22 @@ LRESULT CALLBACK win_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     } break;
 
     case WM_PAINT: {
-        char buf[32] = {};
-        auto vk      = VK_KEYS[last_pos()];
-        auto key     = get_key(vk, SHIFT_KEY);
-        auto ctrl    = CTRL_KEY ? "CTRL + " : "";
-        auto alt     = ALT_KEY ? "ALT + " : "";
-        auto shift   = SHIFT_KEY ? "SHIFT + " : "";
-
-        snprintf(buf, COUNT_OF(buf), "%s%s%s%s", ctrl, alt, shift, key);
-
-        auto rect   = RECT{};
-        auto ps     = PAINTSTRUCT{};
-        auto hdc    = BeginPaint(hwnd, &ps);
-
-        GetClientRect(hwnd, &rect);
-        FillRect(hdc, &rect, HBRUSH(COLOR_WINDOW + 1));
-        //DrawText(hdc, buf, -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
-        TextOut(hdc, 50, 50, buf, strnlen(buf, COUNT_OF(buf)));
-        EndPaint(hwnd, &ps);
-
+        render(hwnd);
         return 0;
     } break;
 
     case WM_DESTROY: {
         if (!UnhookWindowsHookEx(state->kb_hook))
             log("Failed to unkook keyboard hook");
+
         PostQuitMessage(0);
+
         return 0;
     } break;
 
-    default: {
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    } break;
     }
+
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
 int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
@@ -272,6 +399,11 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
     
     auto wndClass = WNDCLASSEX{};
     auto state    = AppState{};
+    auto gpInput  = gp::GdiplusStartupInput{};
+    auto gpToken  = ULONG_PTR{};
+
+    gp::GdiplusStartup(&gpToken, &gpInput, nullptr);
+    defer(gp::GdiplusShutdown(gpToken));
 
     state.hInstance = hinstance;
 
@@ -288,14 +420,14 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
     }
 
     auto hwnd = CreateWindowEx( 
-        WS_EX_TOOLWINDOW|WS_EX_TOPMOST, // extended styles           
+        WS_EX_TOOLWINDOW|WS_EX_TOPMOST|WS_EX_LAYERED,
         wndClass.lpszClassName, // class name                   
         "pwThief",              // window name                  
         WS_OVERLAPPEDWINDOW,    // overlapped window            
         CW_USEDEFAULT,          // default horizontal position  
         CW_USEDEFAULT,          // default vertical position    
-        300,                    // default width                
-        200,                    // default height               
+        600,                    // default width
+        600,                    // default height
         (HWND) nullptr,         // no parent or owner window    
         (HMENU) nullptr,        // class menu used              
         hinstance,              // instance handle              
@@ -308,7 +440,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
     else WINDOW = hwnd;
  
     ShowWindow(hwnd, SW_SHOW); 
-    UpdateWindow(hwnd);
+    render(hwnd);
 
     auto msg = MSG{};
     while (GetMessage(&msg, nullptr, 0, 0)) {
