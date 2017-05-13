@@ -160,7 +160,7 @@ void draw_rectangle(gp::Graphics *graphics,
     graphics->FillPath(&brush, &path);
 }
 
-void draw_keypresses(HWND hwnd, HDC hdc, RECT clientArea)
+void draw_keypresses(HWND hwnd, gp::Graphics *graphics, RECT clientArea)
 {
     wchar_t buf[32] = {0};
     auto state   = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -173,17 +173,16 @@ void draw_keypresses(HWND hwnd, HDC hdc, RECT clientArea)
 
     assert(written != -1);
 
-    gp::Graphics     graphics(hdc);
     gp::Font         font(L"Consolas", 15, gp::FontStyleRegular, gp::UnitPixel);
     gp::RectF        textDim(20, 55, 200, 15);
     gp::SolidBrush   white(gp::Color(255, 255, 255, 255));
     gp::Color        black(255, 1, 1, 1);
     gp::StringFormat format;
 
-    graphics.SetSmoothingMode(gp::SmoothingModeHighQuality);
-    draw_rectangle(&graphics, 20, 20, 200, 80, black);
+    graphics->SetSmoothingMode(gp::SmoothingModeHighQuality);
+    draw_rectangle(graphics, 20, 20, 200, 80, black);
     format.SetAlignment(gp::StringAlignmentCenter);
-    graphics.DrawString(buf, -1, &font, textDim, &format, &white);
+    graphics->DrawString(buf, -1, &font, textDim, &format, &white);
 }
 
 void render(HWND hwnd)
@@ -213,7 +212,7 @@ void render(HWND hwnd)
         gp::Pen      blackPen(gp::Color(255, 0, 0, 1), 5);
 
         graphics.DrawRectangle(&blackPen, 0, 0, i32(width), i32(height));
-        draw_keypresses(hwnd, hdc, wndDim);
+        draw_keypresses(hwnd, &graphics, wndDim);
 
         blend.BlendOp             = AC_SRC_OVER;
         blend.BlendFlags          = 0;
@@ -246,7 +245,7 @@ void render(HWND hwnd)
 
         SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 255, LWA_ALPHA);
         graphics.FillRectangle(&white, 0, 0, width, height);
-        draw_keypresses(hwnd, hdc, rect);
+        draw_keypresses(hwnd, &graphics, rect);
     }
 }
 
