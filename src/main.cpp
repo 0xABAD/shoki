@@ -191,7 +191,7 @@ void render(HWND hwnd)
 
     if (state->hideWindow) {
         RECT wndDim;
-        GetWindowRect(WINDOW, &wndDim);
+        GetWindowRect(hwnd, &wndDim);
 
         auto width   = wndDim.right - wndDim.left;
         auto height  = wndDim.bottom - wndDim.top;
