@@ -1,0 +1,21 @@
+
+* TODO Align modifier text next to keypress
+
+* TODO Setup keypress combo buffer
+
+* TODO Use correct size for text rectangle
+
+* TODO Allow font selection and size configuration
+
+* TODO Allow rectangle and text color configuration
+
+* TODO Line up rectangle in correct position for hidden mode
+
+* TODO Ensure mouse clicks aren't captured by invisible window
+  area in hidden mode.
+
+* TODO Fade out keypress rectangle
+
+* TODO Allow fade out time configuration
+
+* TODO Allow keypress combo buffer configuration
