@@ -336,7 +336,6 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
         switch (wParam) {
         case WM_KEYDOWN: {
             auto kb = (KBDLLHOOKSTRUCT *)lParam;
-            doRedraw = true;
             state->set_key(kb->vkCode, true);
         } break;
 
@@ -377,7 +376,6 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
          */
         case WM_SYSKEYDOWN: {
             auto kb = (KBDLLHOOKSTRUCT *)lParam;
-            doRedraw = true;
             state->set_key(kb->vkCode, true);
         } break;
 
