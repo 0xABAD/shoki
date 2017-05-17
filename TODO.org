@@ -1,7 +1,7 @@
 
 * TODO Align modifier text next to keypress
 
-* TODO Setup keypress combo buffer
+* DONE Setup keypress combo buffer
 
 * TODO Use correct size for text rectangle
 

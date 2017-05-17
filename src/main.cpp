@@ -1,5 +1,5 @@
 #include "bl_common.hpp"
-#include "bl_winhelp.cpp" // allocate_console
+#include "bl_winhelp.cpp"
 
 #include <gdiplus.h>
 #include <cstring>
@@ -9,45 +9,7 @@ namespace gp {
 using namespace Gdiplus;
 }
 
-struct AppState {
-    HHOOK     kb_hook;
-    HINSTANCE hInstance;
-    bool      hideWindow;
-    bool      hasError;
-
-    void check_status(gp::Status status) {
-        if (status != gp::Ok && !hasError) {
-            hasError = true;
-            MessageBoxA(nullptr, "GDI+ error", "Error", MB_OK|MB_ICONEXCLAMATION);
-        }
-    }
-};
-
 static HWND WINDOW;
-
-static bool ALT_KEY   = false;
-static bool CTRL_KEY  = false;
-static bool SHIFT_KEY = false;
-
-constexpr u32 MAX_KEYS = 10;
-
-static u32 VK_KEYS[MAX_KEYS];
-static u32 KEY_POS = 0;
-
-u32 last_pos()
-{
-    return (KEY_POS - 1) % MAX_KEYS;
-}
-
-void set_key(u32 vk_key)
-{
-    // avoid setting keys that are held down
-    if (vk_key != VK_KEYS[last_pos()]) {
-        VK_KEYS[KEY_POS] = vk_key;
-        KEY_POS++;
-        KEY_POS = KEY_POS % MAX_KEYS;
-    }
-}
 
 wchar_t const * get_key(u32 vk_key, bool isShiftDown)
 {
@@ -133,6 +95,113 @@ wchar_t const * get_key(u32 vk_key, bool isShiftDown)
     }
 }
 
+struct KeyCombo {
+    u32  vk_key;
+    bool isAltDown;
+    bool isCtrlDown;
+    bool isShiftDown;
+};
+
+struct KeyComboIter {
+    i32  index;
+    bool hasWrapped;
+};
+
+constexpr u32 MAX_KEY_COMBOS = 7;
+
+struct AppState {
+    HHOOK     kb_hook;
+    HINSTANCE hInstance;
+    bool      hideWindow;
+    bool      hasError;
+
+    /*
+     * Key combos will be maintained in a stack.  When there are no
+     * more key presses over a short period of time the stack will be
+     * emptied (i.e. the key press rectangle fades out of view).  If
+     * the user is typing quickly and overflows the stack buffer then
+     * turns into a ring buffer.  A keyComboIndex of -1 indicates
+     * there are no stored key combos.
+     */
+    KeyCombo keyCombos[MAX_KEY_COMBOS];
+    u32      maxUserConfigCombos;
+    i32      keyComboIndex;
+    bool     isOverflowed;
+
+    KeyCombo possibleCombo;
+
+    void set_key(DWORD vk, bool isDownState) {
+        if (vk == VK_LCONTROL || vk == VK_RCONTROL) {
+            possibleCombo.isCtrlDown = isDownState;
+        }
+        else if (vk == VK_LMENU || vk == VK_RMENU) {
+            possibleCombo.isAltDown = isDownState;
+        }
+        else if (vk == VK_LSHIFT || vk == VK_RSHIFT) {
+            possibleCombo.isShiftDown = isDownState;
+        }
+        else if (!isDownState && get_key(vk, false) != L"") {
+            possibleCombo.vk_key = vk;
+            add_combo();
+        }
+    }
+
+    bool is_empty() { return keyComboIndex == -1; }
+
+    KeyComboIter begin() {
+        return KeyComboIter { keyComboIndex, false };
+    }
+
+    bool at_end(KeyComboIter iter) {
+        if (isOverflowed && iter.hasWrapped)
+            return iter.index == keyComboIndex;
+
+        return iter.index == -1;
+    }
+
+    void incr(KeyComboIter *iter) {
+        iter->index = iter->index - 1;
+
+        if (isOverflowed && iter->index == -1) {
+            iter->hasWrapped = true;
+            iter->index      = maxUserConfigCombos - 1;
+        }
+    }
+
+    KeyCombo get_combo(KeyComboIter iter) {
+        assert(iter.index > -1 && iter.index < maxUserConfigCombos);
+        return keyCombos[iter.index];
+    }
+
+    void add_combo() {
+        ++keyComboIndex;
+        if (keyComboIndex == maxUserConfigCombos) {
+            isOverflowed  = true;
+            keyComboIndex = 0;
+        }
+
+        keyCombos[keyComboIndex] = possibleCombo;
+    }
+
+    void reset_combos() {
+        keyComboIndex = -1;
+        isOverflowed  = false;
+    }
+
+    void set_max_combos(u32 maxCombos) {
+        assert(maxCombos >= 1 && maxCombos <= MAX_KEY_COMBOS);
+        maxUserConfigCombos = maxCombos;
+        reset_combos();
+    }
+
+    void check_status(gp::Status status) {
+        if (status != gp::Ok && !hasError) {
+            hasError = true;
+            MessageBoxA(nullptr, "GDI+ error", "Error", MB_OK|MB_ICONEXCLAMATION);
+        }
+    }
+};
+
 constexpr void log(char const *msg)
 {
 #if defined(DEBUG)
@@ -162,16 +231,10 @@ void draw_rectangle(gp::Graphics *graphics,
 
 void draw_keypresses(HWND hwnd, gp::Graphics *graphics, RECT clientArea)
 {
-    wchar_t buf[32] = {0};
-    auto state   = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
-    auto vk      = VK_KEYS[last_pos()];
-    auto key     = get_key(vk, SHIFT_KEY);
-    auto ctrl    = CTRL_KEY ? L"CTRL + " : L"";
-    auto alt     = ALT_KEY ? L"ALT + " : L"";
-    auto shift   = SHIFT_KEY ? L"SHIFT + " : L"";
-    auto written = swprintf_s(buf, L"%s%s%s%s", ctrl, alt, shift, key);
+    auto state = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
-    assert(written != -1);
+    if (state->is_empty())
+        return;
 
     gp::Font         font(L"Consolas", 15, gp::FontStyleRegular, gp::UnitPixel);
     gp::RectF        textDim(20, 55, 200, 15);
@@ -182,7 +245,21 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, RECT clientArea)
     graphics->SetSmoothingMode(gp::SmoothingModeHighQuality);
     draw_rectangle(graphics, 20, 20, 200, 80, black);
     format.SetAlignment(gp::StringAlignmentCenter);
-    graphics->DrawString(buf, -1, &font, textDim, &format, &white);
+
+    for (auto iter = state->begin(); !state->at_end(iter); state->incr(&iter)) {
+        auto combo = state->get_combo(iter);
+
+        wchar_t buf[32] = {0};
+        auto key     = get_key(combo.vk_key, combo.isShiftDown);
+        auto ctrl    = combo.isCtrlDown  ? L"CTRL + "  : L"";
+        auto alt     = combo.isAltDown   ? L"ALT + "   : L"";
+        auto shift   = combo.isShiftDown ? L"SHIFT + " : L"";
+        auto written = swprintf_s(buf, L"%s%s%s%s", ctrl, alt, shift, key);
+
+        assert(written != -1);
+
+        graphics->DrawString(buf, -1, &font, textDim, &format, &white);
+    }
 }
 
 void render(HWND hwnd)
@@ -259,33 +336,22 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
         switch (wParam) {
         case WM_KEYDOWN: {
             auto kb = (KBDLLHOOKSTRUCT *)lParam;
-            auto vk = kb->vkCode;
-
-            if (vk == VK_LCONTROL || vk == VK_RCONTROL)
-                CTRL_KEY = true;
-            else if (vk == VK_LMENU || vk == VK_RMENU)
-                ALT_KEY = true;
-            else if (vk == VK_LSHIFT || vk == VK_RSHIFT)
-                SHIFT_KEY = true;
-            else
-                set_key(kb->vkCode);
-
             doRedraw = true;
+            state->set_key(kb->vkCode, true);
         } break;
 
         case WM_KEYUP: {
             auto kb = (KBDLLHOOKSTRUCT *)lParam;
             auto vk = kb->vkCode;
 
-            if (vk == VK_LCONTROL || vk == VK_RCONTROL)
-                CTRL_KEY = false;
-            if (vk == VK_LMENU || vk == VK_RMENU)
-                ALT_KEY = false;
-            if (vk == VK_LSHIFT || vk == VK_RSHIFT) {
-                SHIFT_KEY = false;
-            }
+            state->set_key(vk, false);
+            doRedraw = true;
 
-            auto toggleWindow = (vk == VK_F6 && SHIFT_KEY && CTRL_KEY && ALT_KEY);
+            auto toggleWindow = (vk == VK_F6 &&
+                                 state->possibleCombo.isShiftDown &&
+                                 state->possibleCombo.isCtrlDown &&
+                                 state->possibleCombo.isAltDown);
+
             if (toggleWindow) {
                 state->hideWindow = !state->hideWindow;
 
@@ -297,8 +363,6 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
                     SetWindowLong(WINDOW, GWL_EXSTYLE, cleared | WS_EX_LAYERED);
                 }
             }
-
-            doRedraw = true;
         } break;
 
         /*
@@ -313,27 +377,13 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
          */
         case WM_SYSKEYDOWN: {
             auto kb = (KBDLLHOOKSTRUCT *)lParam;
-            auto vk = kb->vkCode;
-
-            if (vk == VK_LMENU || vk == VK_RMENU)
-                ALT_KEY  = true;
-            else if (vk == VK_LSHIFT || vk == VK_RSHIFT)
-                SHIFT_KEY = true;
-            else
-                set_key(kb->vkCode);
-
             doRedraw = true;
+            state->set_key(kb->vkCode, true);
         } break;
 
         case WM_SYSKEYUP: {
             auto kb = (KBDLLHOOKSTRUCT *)lParam;
-            auto vk = kb->vkCode;
-
-            if (vk == VK_LSHIFT || vk == VK_RSHIFT)
-                SHIFT_KEY = false;
-            if (vk == VK_LCONTROL || vk == VK_RCONTROL)
-                CTRL_KEY = false;
-
+            state->set_key(kb->vkCode, false);
             doRedraw = true;
         } break;
 
@@ -405,6 +455,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
     defer(gp::GdiplusShutdown(gpToken));
 
     state.hInstance = hinstance;
+    state.set_max_combos(1);
 
     wndClass.cbSize        = sizeof(wndClass);
     wndClass.style         = CS_VREDRAW|CS_HREDRAW;
