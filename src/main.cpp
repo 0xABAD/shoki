@@ -236,29 +236,34 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, RECT clientArea)
     if (state->is_empty())
         return;
 
-    gp::Font         font(L"Consolas", 15, gp::FontStyleRegular, gp::UnitPixel);
-    gp::RectF        textDim(20, 55, 200, 15);
+    gp::Font         letter(L"Consolas", 48, gp::FontStyleBold, gp::UnitPixel);
+    gp::Font         modifier(L"Consolas", 10, gp::FontStyleRegular, gp::UnitPixel);
+    gp::RectF        ltrDim(60, 25, 120, 58);
+    gp::RectF        modDim(35, 35, 35, 58);
     gp::SolidBrush   white(gp::Color(255, 255, 255, 255));
     gp::Color        black(255, 1, 1, 1);
     gp::StringFormat format;
 
     graphics->SetSmoothingMode(gp::SmoothingModeHighQuality);
-    draw_rectangle(graphics, 20, 20, 200, 80, black);
-    format.SetAlignment(gp::StringAlignmentCenter);
+    draw_rectangle(graphics, 20, 20, 120, 50, black);
+    format.SetAlignment(gp::StringAlignmentNear);
 
     for (auto iter = state->begin(); !state->at_end(iter); state->incr(&iter)) {
         auto combo = state->get_combo(iter);
+        auto key   = get_key(combo.vk_key, combo.isShiftDown);
+        auto ctrl  = combo.isCtrlDown  ? L"CTRL"  : L"";
+        auto alt   = combo.isAltDown   ? L"ALT"   : L"";
+        auto shift = combo.isShiftDown ? L"SHIFT" : L"";
 
-        wchar_t buf[32] = {0};
-        auto key     = get_key(combo.vk_key, combo.isShiftDown);
-        auto ctrl    = combo.isCtrlDown  ? L"CTRL + "  : L"";
-        auto alt     = combo.isAltDown   ? L"ALT + "   : L"";
-        auto shift   = combo.isShiftDown ? L"SHIFT + " : L"";
-        auto written = swprintf_s(buf, L"%s%s%s%s", ctrl, alt, shift, key);
+        graphics->DrawString(key, -1, &letter, ltrDim, &format, &white);
 
-        assert(written != -1);
+        graphics->DrawString(ctrl, -1, &modifier, modDim, &format, &white);
+        modDim.Y += 12;
 
-        graphics->DrawString(buf, -1, &font, textDim, &format, &white);
+        graphics->DrawString(alt, -1, &modifier, modDim, &format, &white);
+        modDim.Y += 12;
+
+        graphics->DrawString(shift, -1, &modifier, modDim, &format, &white);
     }
 }
 

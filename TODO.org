@@ -1,5 +1,5 @@
 
-* TODO Align modifier text next to keypress
+* DONE Align modifier text next to keypress
 
 * DONE Setup keypress combo buffer
 
