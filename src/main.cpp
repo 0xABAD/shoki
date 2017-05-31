@@ -1,5 +1,6 @@
 #include "bl_common.hpp"
 #include "bl_winhelp.cpp"
+#include "key_info.cpp"
 
 #include <gdiplus.h>
 #include <cstring>
@@ -10,90 +11,6 @@ using namespace Gdiplus;
 }
 
 static HWND WINDOW;
-
-wchar_t const * get_key(u32 vk_key, bool isShiftDown)
-{
-    switch (vk_key) {
-    case 0x08: return L"BSPC";
-    case 0x09: return L"TAB";
-    case 0x0D: return L"ENTER";
-    case 0x14: return L"CAPS";
-    case 0x20: return L"SPC";
-    case 0x21: return L"PG_UP";
-    case 0x22: return L"PG_DOWN";
-    case 0x23: return L"END";
-    case 0x24: return L"HOME";
-    case 0x25: return L"LEFT";
-    case 0x26: return L"UP";
-    case 0x27: return L"RIGHT";
-    case 0x28: return L"DOWN";
-    case 0x2D: return L"INS";
-    case 0x2E: return L"DEL";
-    case 0x30: return isShiftDown ? L")" : L"0";
-    case 0x31: return isShiftDown ? L"!" : L"1";
-    case 0x32: return isShiftDown ? L"@" : L"2";
-    case 0x33: return isShiftDown ? L"#" : L"3";
-    case 0x34: return isShiftDown ? L"$" : L"4";
-    case 0x35: return isShiftDown ? L"%" : L"5";
-    case 0x36: return isShiftDown ? L"^" : L"6";
-    case 0x37: return isShiftDown ? L"&" : L"7";
-    case 0x38: return isShiftDown ? L"*" : L"8";
-    case 0x39: return isShiftDown ? L"(" : L"9";
-    case 0x41: return L"A";
-    case 0x42: return L"B";
-    case 0x43: return L"C";
-    case 0x44: return L"D";
-    case 0x45: return L"E";
-    case 0x46: return L"F";
-    case 0x47: return L"G";
-    case 0x48: return L"H";
-    case 0x49: return L"I";
-    case 0x4A: return L"J";
-    case 0x4B: return L"K";
-    case 0x4C: return L"L";
-    case 0x4D: return L"M";
-    case 0x4E: return L"N";
-    case 0x4F: return L"O";
-    case 0x50: return L"P";
-    case 0x51: return L"Q";
-    case 0x52: return L"R";
-    case 0x53: return L"S";
-    case 0x54: return L"T";
-    case 0x55: return L"U";
-    case 0x56: return L"V";
-    case 0x57: return L"W";
-    case 0x58: return L"X";
-    case 0x59: return L"Y";
-    case 0x5A: return L"Z";
-
-    case 0xBA: return isShiftDown ? L":" : L";";
-    case 0xBB: return isShiftDown ? L"=" : L"+";
-    case 0xBC: return isShiftDown ? L"<" : L",";
-    case 0xBD: return isShiftDown ? L"_" : L"-";
-    case 0xBE: return isShiftDown ? L">" : L".";
-    case 0xBF: return isShiftDown ? L"?" : L"/";
-    case 0xC0: return isShiftDown ? L"~" : L"`";
-    case 0xDB: return isShiftDown ? L"{" : L"[";
-    case 0xDC: return isShiftDown ? L"|" : L"\\";
-    case 0xDD: return isShiftDown ? L"}" : L"]";
-    case 0xDE: return isShiftDown ? L"\"" : L"'";
-
-    case 0x70: return L"F1";
-    case 0x71: return L"F2";
-    case 0x72: return L"F3";
-    case 0x73: return L"F4";
-    case 0x74: return L"F5";
-    case 0x75: return L"F6";
-    case 0x76: return L"F7";
-    case 0x77: return L"F8";
-    case 0x78: return L"F9";
-    case 0x79: return L"F10";
-    case 0x7A: return L"F11";
-    case 0x7B: return L"F12";
-
-    default: return L"";
-    }
-}
 
 struct KeyCombo {
     u32  vk_key;
@@ -140,7 +57,7 @@ struct AppState {
         else if (vk == VK_LSHIFT || vk == VK_RSHIFT) {
             possibleCombo.isShiftDown = isDownState;
         }
-        else if (!isDownState && get_key(vk, false) != L"") {
+        else if (!isDownState && get_key_info(vk, false).key != L"") {
             possibleCombo.vk_key = vk;
             add_combo();
         }
@@ -249,11 +166,16 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, RECT clientArea)
     format.SetAlignment(gp::StringAlignmentNear);
 
     for (auto iter = state->begin(); !state->at_end(iter); state->incr(&iter)) {
-        auto combo = state->get_combo(iter);
-        auto key   = get_key(combo.vk_key, combo.isShiftDown);
-        auto ctrl  = combo.isCtrlDown  ? L"CTRL"  : L"";
-        auto alt   = combo.isAltDown   ? L"ALT"   : L"";
-        auto shift = combo.isShiftDown ? L"SHIFT" : L"";
+        auto combo   = state->get_combo(iter);
+        auto keyInfo = get_key_info(combo.vk_key, combo.isShiftDown);
+        auto key     = keyInfo.key;
+        auto ctrl    = combo.isCtrlDown  ? L"CTRL"  : L"";
+        auto alt     = combo.isAltDown   ? L"ALT"   : L"";
+        auto shift   = L"";
+
+        if (combo.isShiftDown && !keyInfo.doesShiftAffectKey) {
+            shift = L"SHIFT";
+        }
 
         graphics->DrawString(key, -1, &letter, ltrDim, &format, &white);
 
