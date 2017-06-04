@@ -133,16 +133,17 @@ void draw_rectangle(gp::Graphics *graphics,
                     i32 height,
                     gp::Color color)
 {
-    auto x2 = x1 + width;
-    auto y2 = y1 + height;
+    constexpr i32 CORNER_RADIUS = 10;
+    auto x2 = x1 + width - CORNER_RADIUS;
+    auto y2 = y1 + height - CORNER_RADIUS;
 
     gp::GraphicsPath path;
     gp::SolidBrush   brush(color);
 
-    path.AddArc(x1, y1, 25, 25, -180, 90);
-    path.AddArc(x2, y1, 25, 25,  -90, 90);
-    path.AddArc(x2, y2, 25, 25,    0, 90);
-    path.AddArc(x1, y2, 25, 25,   90, 90);
+    path.AddArc(x1, y1, CORNER_RADIUS, CORNER_RADIUS, -180, 90);
+    path.AddArc(x2, y1, CORNER_RADIUS, CORNER_RADIUS,  -90, 90);
+    path.AddArc(x2, y2, CORNER_RADIUS, CORNER_RADIUS,    0, 90);
+    path.AddArc(x1, y2, CORNER_RADIUS, CORNER_RADIUS,   90, 90);
     graphics->FillPath(&brush, &path);
 }
 
