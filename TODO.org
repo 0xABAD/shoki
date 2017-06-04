@@ -3,7 +3,7 @@
 
 * DONE Setup keypress combo buffer
 
-* TODO Use correct size for text rectangle
+* DONE Use correct size for text rectangle
 
 * TODO Allow font selection and size configuration
 
