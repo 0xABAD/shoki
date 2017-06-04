@@ -393,7 +393,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
     wndClass.style         = CS_VREDRAW|CS_HREDRAW;
     wndClass.lpfnWndProc   = &win_proc;
     wndClass.hInstance     = hinstance;
-    wndClass.lpszClassName = "pwThiefWClass";
+    wndClass.lpszClassName = "shokiWClass";
 
     auto didRegister = RegisterClassEx(&wndClass);
     if (!didRegister) {
@@ -404,7 +404,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
     auto hwnd = CreateWindowEx( 
         WS_EX_TOOLWINDOW|WS_EX_TOPMOST|WS_EX_LAYERED,
         wndClass.lpszClassName, // class name                   
-        "pwThief",              // window name                  
+        "Shoki",                // window name
         WS_OVERLAPPEDWINDOW,    // overlapped window            
         CW_USEDEFAULT,          // default horizontal position  
         CW_USEDEFAULT,          // default vertical position    
