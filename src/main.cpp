@@ -449,7 +449,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
     defer(gp::GdiplusShutdown(gpToken));
 
     state.hInstance = hinstance;
-    state.set_max_combos(1);
+    state.set_max_combos(4);
 
     wndClass.cbSize        = sizeof(wndClass);
     wndClass.style         = CS_VREDRAW|CS_HREDRAW;
