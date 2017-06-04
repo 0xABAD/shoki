@@ -24,7 +24,7 @@ struct KeyComboIter {
     bool hasWrapped;
 };
 
-constexpr u32 MAX_KEY_COMBOS = 7;
+constexpr u32 MAX_KEY_COMBOS = 8;
 
 struct AppState {
     HHOOK     kb_hook;
