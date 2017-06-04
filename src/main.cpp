@@ -147,7 +147,7 @@ void draw_rectangle(gp::Graphics *graphics,
     graphics->FillPath(&brush, &path);
 }
 
-void draw_keypresses(HWND hwnd, gp::Graphics *graphics, RECT clientArea)
+void draw_keypresses(HWND hwnd, gp::Graphics *graphics)
 {
     auto state = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
@@ -277,7 +277,7 @@ void render(HWND hwnd)
         gp::Pen      blackPen(gp::Color(255, 0, 0, 1), 5);
 
         graphics.DrawRectangle(&blackPen, 0, 0, i32(width), i32(height));
-        draw_keypresses(hwnd, &graphics, wndDim);
+        draw_keypresses(hwnd, &graphics);
 
         blend.BlendOp             = AC_SRC_OVER;
         blend.BlendFlags          = 0;
@@ -310,7 +310,7 @@ void render(HWND hwnd)
 
         SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 255, LWA_ALPHA);
         graphics.FillRectangle(&white, 0, 0, width, height);
-        draw_keypresses(hwnd, &graphics, rect);
+        draw_keypresses(hwnd, &graphics);
     }
 }
 
