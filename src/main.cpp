@@ -154,12 +154,21 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, RECT clientArea)
     if (state->is_empty())
         return;
 
-    gp::Font         letter(L"Consolas", 40, gp::FontStyleBold, gp::UnitPixel);
-    gp::Font         modifier(L"Consolas", 8, gp::FontStyleRegular, gp::UnitPixel);
-    gp::RectF        ltrDims[MAX_KEY_COMBOS];
-    gp::RectF        modDims[MAX_KEY_COMBOS];
-    gp::StringFormat format;
+    struct KeyPress {
+        gp::RectF ltrDim;
+        gp::RectF modDim;
+        wchar_t const *key;
+        wchar_t const *ctrl;
+        wchar_t const *alt;
+        wchar_t const *shift;
+    };
 
+    gp::Font letter(L"Consolas", 40, gp::FontStyleBold, gp::UnitPixel);
+    gp::Font modifier(L"Consolas", 8, gp::FontStyleRegular, gp::UnitPixel);
+    KeyPress keypresses[MAX_KEY_COMBOS];
+
+    // Ensures that modifier text stack are left aligned.
+    gp::StringFormat format;
     format.SetAlignment(gp::StringAlignmentNear);
 
     constexpr f32 MOD_LETTER_SPACING = -8.0f; // pixels
@@ -167,70 +176,61 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, RECT clientArea)
     constexpr f32 COMBO_SPACING      = 2.0f;
     constexpr f32 BOX_PADDING        = 2.0f;
 
-    f32 box_wd   = 2*BOX_PADDING;
-    f32 box_ht   = 0.0f;
-    i32 size_idx = 0;
+    f32 box_wd     = 2*BOX_PADDING;
+    f32 box_ht     = 0.0f;
+    i32 pressCount = 0;
 
     for (auto iter = state->begin(); !state->at_end(iter); state->incr(&iter)) {
-        auto combo   = state->get_combo(iter);
-        auto keyInfo = get_key_info(combo.vk_key, combo.isShiftDown);
-        auto key     = keyInfo.key;
-        auto ctrl    = combo.isCtrlDown ? L"CTRL"  : L"";
-        auto alt     = combo.isAltDown  ? L"ALT"   : L"";
-        auto shift   = L"";
+        auto  combo   = state->get_combo(iter);
+        auto  keyInfo = get_key_info(combo.vk_key, combo.isShiftDown);
+        auto &press   = keypresses[pressCount];
+
+        press.key   = keyInfo.key;
+        press.ctrl  = combo.isCtrlDown ? L"CTRL" : L"";
+        press.alt   = combo.isAltDown  ? L"ALT"  : L"";
+        press.shift = L"";
 
         if (combo.isShiftDown && !keyInfo.doesShiftAffectKey)
-            shift = L"SHIFT";
+            press.shift = L"SHIFT";
 
         gp::PointF pt;
-        auto &ltr = ltrDims[size_idx];
-        auto &mod = modDims[size_idx];
+        auto &ltr = press.ltrDim;
+        auto &mod = press.modDim;
 
-        graphics->MeasureString(key, -1, &letter, pt, &format, &ltr);
+        graphics->MeasureString(press.key, -1, &letter, pt, &format, &ltr);
         box_wd += ltr.Width;
         box_ht  = ltr.Height > box_ht ? ltr.Height : box_ht;
 
-        auto isAnyModDown =
-            (combo.isCtrlDown || combo.isAltDown ||
-             (combo.isShiftDown && !keyInfo.doesShiftAffectKey));
+        auto isAnyModDown = (combo.isCtrlDown || combo.isAltDown ||
+                             (combo.isShiftDown && !keyInfo.doesShiftAffectKey));
 
         if (isAnyModDown) {
             graphics->MeasureString(L"SHIFT", -1, &modifier, pt, &format, &mod);
             box_wd += mod.Width + MOD_LETTER_SPACING;
         }
-        ++size_idx;
+        ++pressCount;
     }
 
     // The state->empty() check earlier should make this true.
-    assert(size_idx > 0);
+    assert(pressCount > 0);
 
     gp::SolidBrush white(gp::Color(255, 255, 255, 255));
     gp::Color      black(255, 1, 1, 1);
 
-    box_wd += (size_idx - 1) * COMBO_SPACING;
+    box_wd += (pressCount - 1) * COMBO_SPACING;
     box_ht += 2.0f*BOX_PADDING;
 
     graphics->SetSmoothingMode(gp::SmoothingModeHighQuality);
     draw_rectangle(graphics, 0, 0, box_wd, box_ht, black);
 
-    f32 combo_x   = BOX_PADDING;
-    i32 combo_idx = 0;
+    f32 combo_x = BOX_PADDING;
 
-    for (auto iter = state->begin(); !state->at_end(iter); state->incr(&iter)) {
-        auto combo   = state->get_combo(iter);
-        auto keyInfo = get_key_info(combo.vk_key, combo.isShiftDown);
-        auto key     = keyInfo.key;
-        auto ctrl    = combo.isCtrlDown ? L"CTRL"  : L"";
-        auto alt     = combo.isAltDown  ? L"ALT"   : L"";
-        auto shift   = L"";
-
-        if (combo.isShiftDown && !keyInfo.doesShiftAffectKey)
-            shift = L"SHIFT";
-
-        auto &ltr = ltrDims[combo_idx];
-        auto &mod = modDims[combo_idx];
-        auto offset_y = (ltr.Height - (3.0f * mod.Height) - 2.0f) / 2.0f;
-        auto offset_x = mod.Width > 0 ? mod.Width + MOD_LETTER_SPACING : 0.0f;
+    for (i32 idx = pressCount - 1; idx >= 0; --idx) {
+        auto &press    = keypresses[idx];
+        auto &ltr      = press.ltrDim;
+        auto &mod      = press.modDim;
+        auto  offset_y = (ltr.Height - (3.0f * mod.Height) - 2.0f) / 2.0f;
+        auto  offset_x = mod.Width > 0 ? mod.Width + MOD_LETTER_SPACING : 0.0f;
 
         mod.Y = BOX_PADDING + offset_y;
         ltr.Y = BOX_PADDING;
@@ -239,15 +239,14 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, RECT clientArea)
 
         combo_x += COMBO_SPACING + ltr.Width + offset_x;
 
-        graphics->DrawString(key, -1, &letter, ltr, &format, &white);
-        graphics->DrawString(ctrl, -1, &modifier, mod, &format, &white);
-        mod.Y += mod.Height;
+        graphics->DrawString(press.key, -1, &letter, ltr, &format, &white);
+        graphics->DrawString(press.ctrl, -1, &modifier, mod, &format, &white);
 
-        graphics->DrawString(alt, -1, &modifier, mod, &format, &white);
         mod.Y += mod.Height;
+        graphics->DrawString(press.alt, -1, &modifier, mod, &format, &white);
 
-        graphics->DrawString(shift, -1, &modifier, mod, &format, &white);
-        ++combo_idx;
+        mod.Y += mod.Height;
+        graphics->DrawString(press.shift, -1, &modifier, mod, &format, &white);
     }
 }
 
