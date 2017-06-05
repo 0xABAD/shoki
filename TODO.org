@@ -14,8 +14,12 @@
 * TODO Ensure mouse clicks aren't captured by invisible window
   area in hidden mode.
 
-* TODO Fade out keypress rectangle
+* DONE Fade out keypress rectangle
 
 * TODO Allow fade out time configuration
 
 * TODO Allow keypress combo buffer configuration
+
+* TODO Fix window disappearnce when operating from hidden mode for a while
+
+* TODO Fix text flicker when going from hidden back to config mode
