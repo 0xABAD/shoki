@@ -31,6 +31,11 @@ struct AppState {
     HINSTANCE hInstance;
     bool      hideWindow;
     bool      hasError;
+    UINT_PTR  timerID;
+    f32       opacity;
+    UINT      fadeOutMilliseconds;
+    DWORD     lastTime;
+    DWORD     timerStartTime;
 
     /*
      * Key combos will be maintained in a stack.  When there are no
@@ -216,11 +221,14 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, f32 opacity)
 
     u8 alpha = u8(opacity * 255);
     gp::SolidBrush white(gp::Color(alpha, 255, 255, 255));
-    gp::Color      black(alpha, 1, 1, 1);
+    gp::Color      black(alpha, 0, 0, 0);
 
     box_wd += (pressCount - 1) * COMBO_SPACING;
     box_ht += 2.0f*BOX_PADDING;
 
+    // This text rendering mode needs to be applied; otherwise, the alpha
+    // value of the text color won't be properly applied.
+    graphics->SetTextRenderingHint(gp::TextRenderingHintAntiAliasGridFit);
     graphics->SetSmoothingMode(gp::SmoothingModeHighQuality);
     draw_rectangle(graphics, 0, 0, box_wd, box_ht, black);
 
@@ -251,6 +259,26 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, f32 opacity)
     }
 }
 
+void update_opacity(AppState *state, DWORD currentTime)
+{
+    constexpr DWORD milliseconds = 1;
+    auto elapsed  = currentTime - state->timerStartTime;
+    auto interval = currentTime - state->lastTime;
+
+    state->lastTime = currentTime;
+
+    if (elapsed >= 300*milliseconds) {
+        f32 fade  = f32(2 * state->fadeOutMilliseconds);
+        f32 delta = interval / fade;
+
+        state->opacity -= delta;
+        if (state->opacity <= 0.0f) {
+            state->opacity = 0.0f;
+            KillTimer(WINDOW, state->timerID);
+        }
+    }
+}
+
 void render(HWND hwnd)
 {
     auto state = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -264,10 +292,6 @@ void render(HWND hwnd)
         auto screen  = GetDC(nullptr);
         auto hdc     = CreateCompatibleDC(screen);
         auto bmap    = CreateCompatibleBitmap(screen, width, height);
-        auto blend   = BLENDFUNCTION{};
-        auto dstPt   = POINT{wndDim.left, wndDim.top};
-        auto srcPt   = POINT{0, 0};
-        auto wndSz   = SIZE{width, height};
 
         defer(DeleteObject(bmap));
         defer(DeleteDC(hdc));
@@ -275,15 +299,21 @@ void render(HWND hwnd)
         SelectObject(hdc, bmap);
 
         gp::Graphics graphics(hdc);
-        gp::Pen      blackPen(gp::Color(255, 0, 0, 1), 5);
+        gp::Pen      blackPen(gp::Color(255, 0, 0, 0), 5);
 
         graphics.DrawRectangle(&blackPen, 0, 0, i32(width), i32(height));
-        draw_keypresses(hwnd, &graphics, 1.0f);
+        update_opacity(state, GetTickCount());
+        draw_keypresses(hwnd, &graphics, state->opacity);
+
+        auto dstPt = POINT{wndDim.left, wndDim.top};
+        auto srcPt = POINT{0, 0};
+        auto wndSz = SIZE{width, height};
+        auto blend = BLENDFUNCTION{};
 
         blend.BlendOp             = AC_SRC_OVER;
         blend.BlendFlags          = 0;
         blend.AlphaFormat         = AC_SRC_ALPHA;
-        blend.SourceConstantAlpha = 128;
+        blend.SourceConstantAlpha = 255;
 
         UpdateLayeredWindow(hwnd,
                             screen,
@@ -293,7 +323,7 @@ void render(HWND hwnd)
                             &srcPt,
                             RGB(0, 0, 0),
                             &blend,
-                            ULW_COLORKEY);
+                            ULW_ALPHA);
     }
     else {
         auto rect = RECT{};
@@ -309,10 +339,35 @@ void render(HWND hwnd)
         gp::Graphics   graphics(hdc);
         gp::SolidBrush white(gp::Color(255, 255, 255, 255));
 
-        SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 255, LWA_ALPHA);
+        SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 255, LWA_COLORKEY);
         graphics.FillRectangle(&white, 0, 0, width, height);
-        draw_keypresses(hwnd, &graphics, 1.0f);
+        draw_keypresses(hwnd, &graphics, state->opacity);
     }
+
+    if (state->opacity == 0.0f)
+        state->reset_combos();
+}
+
+VOID CALLBACK fade_out(HWND hwnd, UINT, UINT_PTR, DWORD dwTime)
+{
+    auto state = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+    auto flags = RDW_ERASE|RDW_INVALIDATE|RDW_FRAME|RDW_ALLCHILDREN;
+
+    /*
+     * When the window is set to WS_EX_LAYERED mode, that is everything
+     * but the key presses will be transparent, then this callback
+     * passed to SetTimer will never be called.  In fact, the WM_TIMER
+     * message is never passed to the window procedure either.  Instead,
+     * Windows appears to put the window on an separate animation loop
+     * when the WS_EX_LAYERED is set, which may explain why the documentation
+     * states that the window should be as small as possible when this
+     * is the case for system performance reasons.  Due to this, we have
+     * hoist out the opacity manipulation into a separate function so it
+     * can be also called when the window is being rendered while the
+     * app is set to transparent/hidden mode.
+     */
+    update_opacity(state, dwTime);
+    RedrawWindow(hwnd, nullptr, nullptr, flags);
 }
 
 LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
@@ -341,15 +396,14 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
                                  state->possibleCombo.isAltDown);
 
             if (toggleWindow) {
+                auto current = GetWindowLong(WINDOW, GWL_EXSTYLE);
+                auto cleared = current & ~WS_EX_LAYERED;
+
                 state->hideWindow = !state->hideWindow;
+                SetWindowLong(WINDOW, GWL_EXSTYLE, cleared);
 
-                if (state->hideWindow) {
-                    auto current = GetWindowLong(WINDOW, GWL_EXSTYLE);
-                    auto cleared = current & ~WS_EX_LAYERED;
-
-                    SetWindowLong(WINDOW, GWL_EXSTYLE, cleared);
+                if (state->hideWindow)
                     SetWindowLong(WINDOW, GWL_EXSTYLE, cleared | WS_EX_LAYERED);
-                }
             }
         } break;
 
@@ -377,6 +431,15 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
         } // end switch
 
         if (doRedraw) {
+            constexpr UINT milliseconds = 1;
+
+            state->opacity        = 1.0f;
+            state->timerStartTime = GetTickCount();
+            state->lastTime       = state->timerStartTime;
+
+            if (!SetTimer(WINDOW, state->timerID, 17*milliseconds, fade_out))
+                log("failed to create window timer");
+
             auto flags = RDW_ERASE|RDW_INVALIDATE|RDW_FRAME|RDW_ALLCHILDREN;
             RedrawWindow(WINDOW, nullptr, nullptr, flags);
         }
@@ -448,7 +511,11 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
     gp::GdiplusStartup(&gpToken, &gpInput, nullptr);
     defer(gp::GdiplusShutdown(gpToken));
 
-    state.hInstance = hinstance;
+    state.hInstance           = hinstance;
+    state.opacity             = 1.0f;
+    state.timerID             = 1;
+    state.fadeOutMilliseconds = 200;
+    state.lastTime            = 0;
     state.set_max_combos(4);
 
     wndClass.cbSize        = sizeof(wndClass);
