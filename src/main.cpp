@@ -147,7 +147,7 @@ void draw_rectangle(gp::Graphics *graphics,
     graphics->FillPath(&brush, &path);
 }
 
-void draw_keypresses(HWND hwnd, gp::Graphics *graphics)
+void draw_keypresses(HWND hwnd, gp::Graphics *graphics, f32 opacity)
 {
     auto state = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
@@ -214,8 +214,9 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics)
     // The state->empty() check earlier should make this true.
     assert(pressCount > 0);
 
-    gp::SolidBrush white(gp::Color(255, 255, 255, 255));
-    gp::Color      black(255, 1, 1, 1);
+    u8 alpha = u8(opacity * 255);
+    gp::SolidBrush white(gp::Color(alpha, 255, 255, 255));
+    gp::Color      black(alpha, 1, 1, 1);
 
     box_wd += (pressCount - 1) * COMBO_SPACING;
     box_ht += 2.0f*BOX_PADDING;
@@ -277,7 +278,7 @@ void render(HWND hwnd)
         gp::Pen      blackPen(gp::Color(255, 0, 0, 1), 5);
 
         graphics.DrawRectangle(&blackPen, 0, 0, i32(width), i32(height));
-        draw_keypresses(hwnd, &graphics);
+        draw_keypresses(hwnd, &graphics, 1.0f);
 
         blend.BlendOp             = AC_SRC_OVER;
         blend.BlendFlags          = 0;
@@ -310,7 +311,7 @@ void render(HWND hwnd)
 
         SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 255, LWA_ALPHA);
         graphics.FillRectangle(&white, 0, 0, width, height);
-        draw_keypresses(hwnd, &graphics);
+        draw_keypresses(hwnd, &graphics, 1.0f);
     }
 }
 
