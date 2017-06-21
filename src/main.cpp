@@ -473,7 +473,6 @@ LRESULT CALLBACK win_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_PAINT: {
         render(hwnd);
-        return 0;
     } break;
 
     case WM_SYSCOMMAND: {
