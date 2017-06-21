@@ -124,7 +124,7 @@ struct AppState {
     }
 };
 
-constexpr void log(char const *msg)
+inline void log(char const *msg)
 {
 #if defined(DEBUG)
     puts(msg);
