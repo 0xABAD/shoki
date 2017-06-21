@@ -295,6 +295,7 @@ void render(HWND hwnd)
 
         defer(DeleteObject(bmap));
         defer(DeleteDC(hdc));
+        defer(ReleaseDC(hwnd, screen));
 
         SelectObject(hdc, bmap);
 
