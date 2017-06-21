@@ -479,8 +479,6 @@ LRESULT CALLBACK win_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_SYSCOMMAND: {
         if (wParam == SC_KEYMENU)
             return 0;
-
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
     } break;
 
     case WM_DESTROY: {
