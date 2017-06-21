@@ -62,7 +62,7 @@ KeyInfo get_key_info(u32 vk_key, bool isShiftDown)
     case 0x5A: return KEY_INFO(isShiftDown ? L"Z" : L"z", true);
 
     case 0xBA: return KEY_INFO(isShiftDown ? L":" : L";",  true);
-    case 0xBB: return KEY_INFO(isShiftDown ? L"=" : L"+",  true);
+    case 0xBB: return KEY_INFO(isShiftDown ? L"+" : L"=",  true);
     case 0xBC: return KEY_INFO(isShiftDown ? L"<" : L",",  true);
     case 0xBD: return KEY_INFO(isShiftDown ? L"_" : L"-",  true);
     case 0xBE: return KEY_INFO(isShiftDown ? L">" : L".",  true);
