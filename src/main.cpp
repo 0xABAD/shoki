@@ -385,9 +385,29 @@ void render(HWND hwnd)
 
         gp::Graphics   graphics(hdc);
         gp::SolidBrush white(gp::Color(255, 255, 255, 255));
+        gp::SolidBrush magenta(gp::Color(255, 255, 0, 255));
+
+        auto top    = f32(place.height) * 0.2;
+        auto bottom = f32(place.height) * 0.8;
 
         SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 255, LWA_COLORKEY);
-        graphics.FillRectangle(&white, 0, 0, place.width, place.height);
+        graphics.FillRectangle(&white, 0, 0, place.width, top);
+        graphics.FillRectangle(&magenta, 0, top, place.width + 1, bottom + 1);
+
+        auto textRect = RECT{};
+
+        textRect.left   = 6;
+        textRect.top    = 0;
+        textRect.right  = LONG(place.width);
+        textRect.bottom = LONG(top);
+
+        DrawTextEx(hdc,
+                   "Preview Mode:  Press CTRL + ALT + SHIFT + F6 to toggle window.",
+                   -1,
+                   &textRect,
+                   DT_SINGLELINE|DT_VCENTER|DT_LEFT|DT_WORD_ELLIPSIS,
+                   nullptr);
+
         draw_keypresses(hwnd, &graphics, state->opacity, place);
     }
 
@@ -443,14 +463,18 @@ LRESULT CALLBACK keyboard_hook(int code, WPARAM wParam, LPARAM lParam)
                                  state->possibleCombo.isAltDown);
 
             if (toggleWindow) {
+                /*
+                 * MSDN documentation on layered windows state that when switching
+                 * between UpdateLayeredWindow and SetLayeredWindowAttributes, which
+                 * occurs when we hide or show the window, that the WS_EX_LAYERED
+                 * attribute must be reset.
+                 */
                 auto current = GetWindowLong(WINDOW, GWL_EXSTYLE);
                 auto cleared = current & ~WS_EX_LAYERED;
 
                 state->hideWindow = !state->hideWindow;
                 SetWindowLong(WINDOW, GWL_EXSTYLE, cleared);
-
-                if (state->hideWindow)
-                    SetWindowLong(WINDOW, GWL_EXSTYLE, cleared | WS_EX_LAYERED);
+                SetWindowLong(WINDOW, GWL_EXSTYLE, cleared | WS_EX_LAYERED);
             }
         } break;
 
