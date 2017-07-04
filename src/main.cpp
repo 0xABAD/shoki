@@ -339,9 +339,12 @@ void render(HWND hwnd)
         SelectObject(hdc, bmap);
 
         gp::Graphics graphics(hdc);
-        gp::Pen      blackPen(gp::Color(255, 0, 0, 0), 5);
 
+#if DEBUG
+        gp::Pen blackPen(gp::Color(255, 0, 0, 0), 5);
         graphics.DrawRectangle(&blackPen, 0, 0, i32(place.width), i32(place.height));
+#endif
+
         update_opacity(state, GetTickCount());
         draw_keypresses(hwnd, &graphics, state->opacity, place);
 
