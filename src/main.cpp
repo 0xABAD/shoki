@@ -578,8 +578,8 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE, LPSTR, int)
         WS_OVERLAPPEDWINDOW,    // overlapped window            
         CW_USEDEFAULT,          // default horizontal position  
         CW_USEDEFAULT,          // default vertical position    
-        600,                    // default width
-        600,                    // default height
+        650,                    // default width
+        150,                    // default height
         (HWND) nullptr,         // no parent or owner window    
         (HMENU) nullptr,        // class menu used              
         hinstance,              // instance handle              
