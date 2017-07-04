@@ -124,6 +124,21 @@ struct AppState {
     }
 };
 
+enum PlacementJustification {
+    Justification_Left,
+    Justification_Right,
+    Justification_Center
+};
+
+struct Placement {
+    i32 offset_x;
+    i32 offset_y;
+    i32 width;
+    i32 height;
+
+    PlacementJustification justification;
+};
+
 inline void log(char const *msg)
 {
 #if defined(DEBUG)
@@ -152,7 +167,7 @@ void draw_rectangle(gp::Graphics *graphics,
     graphics->FillPath(&brush, &path);
 }
 
-void draw_keypresses(HWND hwnd, gp::Graphics *graphics, f32 opacity)
+void draw_keypresses(HWND hwnd, gp::Graphics *graphics, f32 opacity, Placement const &placement)
 {
     auto state = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
@@ -226,13 +241,28 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, f32 opacity)
     box_wd += (pressCount - 1) * COMBO_SPACING;
     box_ht += 2.0f*BOX_PADDING;
 
+    f32 start_x = 0;
+    f32 start_y = placement.height - placement.offset_y - box_ht;
+
+    switch (placement.justification) {
+    case Justification_Left:
+        start_x = placement.offset_x;
+        break;
+    case Justification_Right:
+        start_x = placement.width - placement.offset_x - box_wd;
+        break;
+    case Justification_Center:
+        start_x = (placement.width / 2.0f) - (box_wd / 2.0f);
+        break;
+    }
+
     // This text rendering mode needs to be applied; otherwise, the alpha
     // value of the text color won't be properly applied.
     graphics->SetTextRenderingHint(gp::TextRenderingHintAntiAliasGridFit);
     graphics->SetSmoothingMode(gp::SmoothingModeHighQuality);
-    draw_rectangle(graphics, 0, 0, box_wd, box_ht, black);
+    draw_rectangle(graphics, start_x, start_y, box_wd, box_ht, black);
 
-    f32 combo_x = BOX_PADDING;
+    f32 combo_x = BOX_PADDING + start_x;
 
     for (i32 idx = pressCount - 1; idx >= 0; --idx) {
         auto &press    = keypresses[idx];
@@ -241,8 +271,8 @@ void draw_keypresses(HWND hwnd, gp::Graphics *graphics, f32 opacity)
         auto  offset_y = (ltr.Height - (3.0f * mod.Height) - 2.0f) / 2.0f;
         auto  offset_x = mod.Width > 0 ? mod.Width + MOD_LETTER_SPACING : 0.0f;
 
-        mod.Y = BOX_PADDING + offset_y;
-        ltr.Y = BOX_PADDING;
+        mod.Y = BOX_PADDING + offset_y + start_y;
+        ltr.Y = BOX_PADDING + start_y;
         mod.X = combo_x;
         ltr.X = mod.X + offset_x;
 
@@ -281,17 +311,26 @@ void update_opacity(AppState *state, DWORD currentTime)
 
 void render(HWND hwnd)
 {
+    constexpr i32 OFFSET_X = 20;
+    constexpr i32 OFFSET_Y = 15;
+
     auto state = (AppState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
     if (state->hideWindow) {
-        RECT wndDim;
+        auto wndDim = RECT{};
+        auto place  = Placement{};
+
         GetWindowRect(hwnd, &wndDim);
 
-        auto width   = wndDim.right - wndDim.left;
-        auto height  = wndDim.bottom - wndDim.top;
+        place.width         = wndDim.right - wndDim.left;
+        place.height        = wndDim.bottom - wndDim.top;
+        place.offset_x      = OFFSET_X;
+        place.offset_y      = OFFSET_Y;
+        place.justification = Justification_Center;
+
         auto screen  = GetDC(nullptr);
         auto hdc     = CreateCompatibleDC(screen);
-        auto bmap    = CreateCompatibleBitmap(screen, width, height);
+        auto bmap    = CreateCompatibleBitmap(screen, place.width, place.height);
 
         defer(DeleteObject(bmap));
         defer(DeleteDC(hdc));
@@ -302,13 +341,13 @@ void render(HWND hwnd)
         gp::Graphics graphics(hdc);
         gp::Pen      blackPen(gp::Color(255, 0, 0, 0), 5);
 
-        graphics.DrawRectangle(&blackPen, 0, 0, i32(width), i32(height));
+        graphics.DrawRectangle(&blackPen, 0, 0, i32(place.width), i32(place.height));
         update_opacity(state, GetTickCount());
-        draw_keypresses(hwnd, &graphics, state->opacity);
+        draw_keypresses(hwnd, &graphics, state->opacity, place);
 
         auto dstPt = POINT{wndDim.left, wndDim.top};
         auto srcPt = POINT{0, 0};
-        auto wndSz = SIZE{width, height};
+        auto wndSz = SIZE{place.width, place.height};
         auto blend = BLENDFUNCTION{};
 
         blend.BlendOp             = AC_SRC_OVER;
@@ -327,22 +366,26 @@ void render(HWND hwnd)
                             ULW_ALPHA);
     }
     else {
-        auto rect = RECT{};
-        auto ps   = PAINTSTRUCT{};
-        auto hdc  = BeginPaint(hwnd, &ps);
+        auto rect  = RECT{};
+        auto ps    = PAINTSTRUCT{};
+        auto place = Placement{};
+        auto hdc   = BeginPaint(hwnd, &ps);
 
         defer(EndPaint(hwnd, &ps));
         GetClientRect(hwnd, &rect);
-    
-        auto width  = rect.right - rect.left - 1;
-        auto height = rect.bottom - rect.top - 1;
+
+        place.width         = rect.right - rect.left - 1;
+        place.height        = rect.bottom - rect.top - 1;
+        place.offset_x      = OFFSET_X;
+        place.offset_y      = OFFSET_Y;
+        place.justification = Justification_Center;
 
         gp::Graphics   graphics(hdc);
         gp::SolidBrush white(gp::Color(255, 255, 255, 255));
 
         SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 255, LWA_COLORKEY);
-        graphics.FillRectangle(&white, 0, 0, width, height);
-        draw_keypresses(hwnd, &graphics, state->opacity);
+        graphics.FillRectangle(&white, 0, 0, place.width, place.height);
+        draw_keypresses(hwnd, &graphics, state->opacity, place);
     }
 
     if (state->opacity == 0.0f)
