@@ -9,7 +9,7 @@
 
 * TODO Allow rectangle and text color configuration
 
-* TODO Line up rectangle in correct position for hidden mode
+* DONE Line up rectangle in correct position for hidden mode
 
 * DONE Ensure mouse clicks aren't captured by invisible window
   area in hidden mode.
@@ -22,4 +22,3 @@
 
 * DONE Fix window disappearnce when operating from hidden mode for a while
 
-* TODO Fix text flicker when going from hidden back to config mode
